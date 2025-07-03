@@ -22,6 +22,8 @@
 ebpf_file_monitor/                   # 项目根目录
 ├── CMakeLists.txt                   # 顶层 CMake 构建文件
 ├── README.md                        # 项目说明文档
+├── external/                        # 依赖库
+│   ├── libbpf                       
 ├── include/                         # 公共头文件目录
 │   ├── common.h                     # 通用定义（常量、工具宏）
 │   ├── logger.h                     # 日志接口定义（用户态）
