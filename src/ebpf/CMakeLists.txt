@@ -2,8 +2,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(ebpf_file_monitor_bpf)
 
-# 不用 find_package，改为 add_subdirectory
-add_subdirectory(${CMAKE_SOURCE_DIR}/external/libbpf)
+# 编译外部 libbpf
+add_subdirectory(
+    ${CMAKE_SOURCE_DIR}/external/libbpf
+    ${CMAKE_BINARY_DIR}/libbpf-build
+)
 
 # clang编译bpf程序的flags
 set(CMAKE_C_FLAGS "-g -O2 -Wall -Werror --target=bpf")
@@ -20,14 +23,21 @@ target_include_directories(file_monitor_bpf PRIVATE
     ${CMAKE_SOURCE_DIR}/src/ebpf
 )
 
-
-# 连接 libbpf 静态库
-target_link_libraries(file_monitor_bpf
-    bpf
-)
-
 # 编译后把 .o 复制到 bin 目录方便加载
 add_custom_command(TARGET file_monitor_bpf POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:file_monitor_bpf> ${CMAKE_BINARY_DIR}/bin/file_monitor.bpf.o
+)
+
+# 拷贝 .o 文件到 bin 目录
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/bin/file_monitor.bpf.o
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:file_monitor_bpf> ${CMAKE_BINARY_DIR}/bin/file_monitor.bpf.o
+    DEPENDS file_monitor_bpf
+)
+
+# 创建构建目标
+add_custom_target(file_monitor_bpf_target
+    DEPENDS ${CMAKE_BINARY_DIR}/bin/file_monitor.bpf.o
 )

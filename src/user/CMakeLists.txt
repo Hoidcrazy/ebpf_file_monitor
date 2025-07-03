@@ -27,3 +27,5 @@ target_link_libraries(ebpf_file_monitor
 target_compile_options(ebpf_file_monitor PRIVATE
     -g -O2
 )
+
+add_dependencies(user_binary_target file_monitor_bpf_target)
