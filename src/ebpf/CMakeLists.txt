@@ -1,20 +1,33 @@
+## src/ebpf/CMakeLists.txt
 cmake_minimum_required(VERSION 3.16)
 project(ebpf_file_monitor_bpf)
 
-find_package(Clang REQUIRED)
-find_package(LibBPF REQUIRED)
+# 不用 find_package，改为 add_subdirectory
+add_subdirectory(${CMAKE_SOURCE_DIR}/external/libbpf)
 
-set(CMAKE_C_FLAGS "-g -O2 -Wall -Werror")
-set(CMAKE_C_COMPILER clang)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --target=bpf")
+# clang编译bpf程序的flags
+set(CMAKE_C_FLAGS "-g -O2 -Wall -Werror --target=bpf")
 
-# 编译 BPF 程序生成 .o 对象
+# 编译 file_monitor.bpf.c 为 CO-RE 兼容的 BPF 对象文件
 add_library(file_monitor_bpf OBJECT file_monitor.bpf.c)
-# 指定 BPF 对象为 CO-RE 模式，LIBBPF 会处理 BTF
-target_include_directories(file_monitor_bpf PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(file_monitor_bpf bpf)
 
-# 将 BPF 对象复制到用户态可加载位置
+# 该 BPF 对象启用 CO-RE（Compile Once – Run Everywhere）模式，
+# libbpf 会利用内核中的 BTF（BPF Type Format）信息，
+# 实现 BPF 程序跨内核版本的兼容加载和运行
+target_include_directories(file_monitor_bpf PRIVATE
+    ${CMAKE_SOURCE_DIR}/external/libbpf/include
+    ${CMAKE_SOURCE_DIR}/external/libbpf/src
+    ${CMAKE_SOURCE_DIR}/src/ebpf
+)
+
+
+# 连接 libbpf 静态库
+target_link_libraries(file_monitor_bpf
+    bpf
+)
+
+# 编译后把 .o 复制到 bin 目录方便加载
 add_custom_command(TARGET file_monitor_bpf POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:file_monitor_bpf> ${CMAKE_BINARY_DIR}/bin/file_monitor.bpf.o
 )
