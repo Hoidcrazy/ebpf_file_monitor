@@ -9,9 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 设置输出目录
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}build/bin)
 
+# 不添加 external/libbpf 子目录，改为手动设置 include 和 lib 路径
+# add_subdirectory(external/libbpf)  # 删除或注释掉
+
 # 增加子目录：ebpf 内核程序和用户态程序
 add_subdirectory(src/ebpf)
 add_subdirectory(src/user)
-
-# 让用户程序等 file_monitor.bpf.o 编译完
-add_dependencies(user_program file_monitor_bpf_target)

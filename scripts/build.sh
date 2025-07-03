@@ -11,5 +11,5 @@ mkdir -p "$PROJECT_ROOT/build"
 cd "$PROJECT_ROOT/build"
 
 # 构建项目
-cmake "$PROJECT_ROOT"
-make
+cmake ..
+make VERBOSE=1
