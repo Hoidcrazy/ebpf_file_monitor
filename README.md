@@ -140,7 +140,7 @@ cd ebpf_file_monitor
 sudo ./scripts/run.sh
 ```
 
-运行时，终端将实时打印文件打开、读取、关闭的事件日志，包含路径和操作信息。
+> 运行时，终端将实时打印文件打开、读取、关闭的事件日志，包含路径和操作信息。
 
 ---
 
@@ -153,16 +153,20 @@ sudo ./scripts/run.sh
 
 ### 编译与运行说明
 
-- **eBPF 内核程序**：通过 CMake 调用 **Clang/LLVM** 编译，已在 `scripts/build.sh` 中自动配置。
-- **测试程序**：使用 **GCC** 编译位于 `tests/` 目录下的测试文件。
+- 测试程序由 `tests/test_basic.c` 驱动，通过 GCC 编译：
 
 ```bash
+# 进入项目根目录下 tests 子目录
+cd tests
+
 # 编译测试程序
-gcc tests/test_basic.c -o test_basic
+gcc test_basic.c -o test_basic
 
 # 运行测试，自动读取并触发欺骗逻辑
-./test_basic tests/test_docs/test_content.txt
+./test_basic
 ```
+
+> 该程序会自动读取 `tests/test_docs/test_content.txt`，触发 eBPF 缓冲区修改逻辑。
 
 ### 预期结果
 
