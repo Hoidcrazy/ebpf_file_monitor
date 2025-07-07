@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(ebpf_file_monitor VERSION 1.0.0 LANGUAGES C CXX)
+project(ebpf_file_monitor
+        VERSION 1.0.0
+        LANGUAGES C CXX)
 
 # 设置编译选项
 set(CMAKE_C_STANDARD 11)
@@ -14,16 +16,24 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # 查找依赖包
 find_package(Threads REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBELF REQUIRED libelf)
+pkg_check_modules(ZLIB REQUIRED zlib)
 
 # 添加libbpf编译目标
-add_subdirectory(external/libbpf)
+add_subdirectory(external/libbpf/src EXCLUDE_FROM_ALL)
 
-# 设置bpftool路径变量
-set(BPFTOOL ${CMAKE_BINARY_DIR}/external/libbpf/tools/bpftool/bpftool CACHE INTERNAL "Path to bpftool")
+# 添加bpftool编译目标
+add_subdirectory(external/libbpf/tools EXCLUDE_FROM_ALL)
 
 # 添加eBPF程序和用户态程序
 add_subdirectory(src/ebpf)
 add_subdirectory(src/user)
+
+# 添加测试目录
+if(BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
 
 # 安装目标
 install(DIRECTORY ${CMAKE_BINARY_DIR}/bin/ DESTINATION bin)
