@@ -26,7 +26,6 @@ ebpf_file_monitor/                   # 项目根目录
 │   ├── libbpf/                      # libbpf 源码集成
 │   │   ├── CMakeLists.txt
 │   └── bpftool/                     # bpftool 源码集成
-│       ├── CMakeLists.txt      
 ├── include/                         # 公共头文件目录
 │   ├── common.h                     # 通用定义（常量、工具宏）
 │   ├── logger.h                     # 日志接口定义（用户态）
