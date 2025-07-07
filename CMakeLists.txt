@@ -3,6 +3,12 @@ project(ebpf_file_monitor
         VERSION 1.0.0
         LANGUAGES C CXX)
 
+# 查找Clang
+find_program(CLANG "clang" REQUIRED)
+if(NOT CLANG)
+    message(FATAL_ERROR "Clang compiler not found")
+endif()
+
 # 设置编译选项
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
