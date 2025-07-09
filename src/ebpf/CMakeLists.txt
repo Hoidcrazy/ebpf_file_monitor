@@ -1,61 +1,97 @@
-# src/ebpf/CMakeLists.txt
-# 编译eBPF内核程序
+cmake_minimum_required(VERSION 3.16)
 
-# 查找Clang
-find_program(CLANG_EXECUTABLE clang REQUIRED)
-find_program(LLVM_STRIP_EXECUTABLE llvm-strip REQUIRED)
-
-# 设置BPF编译标志
-set(BPF_FLAGS
-    -target bpf
-    -g
-    -O2
-    -Wall
-    -Werror
-    -D__TARGET_ARCH_x86
+# 设置 eBPF 包含路径
+set(EBPF_INCLUDES
+    "${KERNEL_HEADERS_DIR}/arch/x86/include"
+    "${KERNEL_HEADERS_DIR}/arch/x86/include/generated"
+    "${KERNEL_HEADERS_DIR}/include"
+    "${KERNEL_HEADERS_DIR}/arch/x86/include/uapi"
+    "${KERNEL_HEADERS_DIR}/arch/x86/include/generated/uapi"
+    "${KERNEL_HEADERS_DIR}/include/uapi"
+    "${KERNEL_HEADERS_DIR}/include/generated/uapi"
+    "${PROJECT_SOURCE_DIR}/include"
+    "${LIBBPF_BUILD_DIR}/include"
 )
 
-# 包含目录
-include_directories(
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/external/libbpf/include
-)
-
-# 添加eBPF源文件
-set(EBPF_SOURCES
-    file_monitor.bpf.c
-    fd_map.bpf.c
-)
-
-# 为每个eBPF源文件创建编译目标
-foreach(src ${EBPF_SOURCES})
-    get_filename_component(name ${src} NAME_WE)
-    
-    # 编译.o文件
-    add_custom_command(
-        OUTPUT ${name}.bpf.o
-        COMMAND ${CLANG_EXECUTABLE} ${BPF_FLAGS} -c ${CMAKE_CURRENT_SOURCE_DIR}/${src} -o ${name}.bpf.o
-        DEPENDS ${src}
-        COMMENT "Compiling eBPF program: ${src}"
-    )
-    
-    # 生成skeleton头文件
-    add_custom_command(
-        OUTPUT ${name}.skel.h
-        COMMAND ${BPFTOOL_PATH} gen skeleton ${name}.bpf.o > ${name}.skel.h
-        DEPENDS ${name}.bpf.o bpftool_build
-        COMMENT "Generating skeleton for ${name}"
-    )
-    
-    # 添加到目标
-    list(APPEND EBPF_OBJECTS ${name}.bpf.o)
-    list(APPEND EBPF_SKELETONS ${name}.skel.h)
+# 生成包含标志
+set(EBPF_INCLUDE_FLAGS "")
+foreach(include_dir IN LISTS EBPF_INCLUDES)
+    set(EBPF_INCLUDE_FLAGS "${EBPF_INCLUDE_FLAGS}-I${include_dir} ")
 endforeach()
 
-# 创建自定义目标
-add_custom_target(ebpf_programs ALL
-    DEPENDS ${EBPF_OBJECTS} ${EBPF_SKELETONS}
+# 设置 eBPF 编译标志
+set(EBPF_CFLAGS
+    "${EBPF_INCLUDE_FLAGS}"
+    "-O2 -g"
+    "--target=bpf"
+    "-D__TARGET_ARCH_x86"
+    "-mcpu=v3"
 )
 
-# 安装eBPF程序
-install(FILES ${EBPF_OBJECTS} DESTINATION ebpf)
+# 添加 Clang 12 的特定优化
+list(APPEND EBPF_CFLAGS
+    "-Xclang -disable-llvm-passes"
+    "-Xclang -debug-info-kind=limited"
+)
+
+# 创建 eBPF 输出目录
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/ebpf)
+
+# 添加 eBPF 目标
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.bpf.o
+    COMMAND ${CLANG} ${EBPF_CFLAGS} -c ${CMAKE_CURRENT_SOURCE_DIR}/file_monitor.bpf.c -o ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.bpf.o
+    DEPENDS file_monitor.bpf.c
+    COMMENT "Compiling eBPF program: file_monitor.bpf.c"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/bin/ebpf/fd_map.bpf.o
+    COMMAND ${CLANG} ${EBPF_CFLAGS} -c ${CMAKE_CURRENT_SOURCE_DIR}/fd_map.bpf.c -o ${CMAKE_BINARY_DIR}/bin/ebpf/fd_map.bpf.o
+    DEPENDS fd_map.bpf.c
+    COMMENT "Compiling eBPF program: fd_map.bpf.c"
+    VERBATIM
+)
+
+# 生成带 BTF 的对象文件
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
+    COMMAND ${CLANG} ${EBPF_CFLAGS} -g -c ${CMAKE_CURRENT_SOURCE_DIR}/file_monitor.bpf.c -o ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
+    DEPENDS file_monitor.bpf.c
+    COMMENT "Generating BTF-enabled eBPF object"
+    VERBATIM
+)
+
+# 生成 skeleton 头文件
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.skel.h
+    COMMAND ${BPFTOOL} gen skeleton ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o > ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.skel.h
+    DEPENDS ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
+    COMMENT "Generating BPF skeleton from BTF object"
+    VERBATIM
+)
+
+# 创建 eBPF 目标
+add_custom_target(ebpf_programs ALL
+    DEPENDS 
+        ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.bpf.o
+        ${CMAKE_BINARY_DIR}/bin/ebpf/fd_map.bpf.o
+        ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
+        ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.skel.h
+)
+
+# 安装规则
+install(FILES 
+    ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.bpf.o
+    ${CMAKE_BINARY_DIR}/bin/ebpf/fd_map.bpf.o
+    ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
+    DESTINATION bin/ebpf
+)
+
+# 添加自定义目标验证 BTF
+add_custom_target(verify_btf
+    COMMAND ${LLVM_OBJDUMP} -S ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o | grep BTF
+    COMMENT "Verifying BTF support in eBPF object"
+    DEPENDS ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
+)

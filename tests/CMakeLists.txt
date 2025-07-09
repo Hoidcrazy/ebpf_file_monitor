@@ -1,19 +1,28 @@
-# tests/CMakeLists.txt
-# 编译测试程序
+cmake_minimum_required(VERSION 3.16)
 
-# 添加测试程序
-add_executable(test_basic test_basic.cpp)
+# 添加测试可执行文件
+add_executable(test_basic
+    test_basic.cpp
+)
 
-# 设置测试目录
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/log)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_docs)
+# 包含目录
+target_include_directories(test_basic
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+)
 
-# 创建测试文件
-file(WRITE ${CMAKE_BINARY_DIR}/tests/test_docs/test_content.txt 
-    "这是一段初始测试文件。")
+# 复制测试文件到 build/bin/test_docs
+add_custom_command(
+    TARGET test_basic POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_docs
+        ${CMAKE_BINARY_DIR}/bin/test_docs
+    COMMENT "Copying test documents to build/bin"
+)
 
 # 添加测试
-add_test(NAME file_monitor_test
+enable_testing()
+add_test(NAME BasicFileMonitorTest 
     COMMAND ${CMAKE_BINARY_DIR}/bin/test_basic
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tests
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )

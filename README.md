@@ -2,7 +2,7 @@
 
 一个基于 **eBPF** 的文件操作生命周期追踪与数据欺骗系统。通过 hook `open`、`read`、`write`、`close` 系统调用，实时监控文件的使用行为，并在读取 `.txt` 文件时动态篡改其内容，实现对用户态程序的“数据欺骗”。
 
-项目采用 `C++` 实现用户态逻辑，`C` 实现 eBPF 内核程序，支持 Linux 4.19 及以上内核版本，兼容 CentOS 7、Ubuntu、麒麟等主流 Linux 发行版。支持 CO-RE（Compile Once, Run Everywhere）与 ring/perf buffer 通信。
+项目采用 `C++` 实现用户态逻辑，`C` 实现 eBPF 内核程序，支持 Linux 5.1 及以上内核版本，兼容麒麟等国产 Linux 发行版。支持 CO-RE（Compile Once, Run Everywhere）与 ring/perf buffer 通信。
 
 ---
 
@@ -12,7 +12,7 @@
 - ✅ 实现文件的生命周期追踪并输出控制台与日志
 - ✅ 构建 `fd → filepath` 映射表
 - ✅ 在读取 `.txt` 文件时修改缓冲区内容，欺骗应用程序
-- ✅ 支持 Linux 4.19+，优雅兼容低版本（通过 perf buffer）
+- ✅ 支持 Linux 5.1+，优雅兼容低版本（通过 perf buffer）
 
 ---
 
@@ -25,14 +25,13 @@ ebpf_file_monitor/                   # 项目根目录
 ├── external/                        # 依赖库（源码方式集成）
 │   ├── libbpf/                      # libbpf 源码集成
 │   │   ├── CMakeLists.txt
-│   └── bpftool/                     # bpftool 源码集成
 ├── include/                         # 公共头文件目录
 │   ├── common.h                     # 通用定义（常量、工具宏）
 │   ├── logger.h                     # 日志接口定义（用户态）
 │   ├── event_structs.h              # 内核向用户态传递的事件结构体定义
 │   └── bpf_loader.h                 # eBPF 加载器与事件处理类声明
 ├── src/                             # 源码目录（用户态 + 内核态）
-│   ├── user/                        # 用户态程序（C 实现）
+│   ├── user/                        # 用户态程序（C++ 实现）
 │   │   ├── main.cpp                 # 主程序入口
 │   │   ├── logger.cpp               # 日志模块实现
 │   │   ├── bpf_loader.cpp           # 事件处理、buffer选择、数据解析、通信机制
@@ -113,11 +112,11 @@ ebpf_file_monitor/                   # 项目根目录
 
 | 工具组件     | 推荐版本 |
 |--------------|----------|
-| Linux 内核    | **≥ 4.19**（必须） |
-| Clang/LLVM    | **11+**（编译 eBPF） |
-| GCC           | **11+**（编译用户态） |
+| Linux 内核    | **≥ 5.1**（必须） |
+| Clang/LLVM    | **12+**（编译 eBPF） |
+| GCC           | **12+**（编译用户态） |
 | CMake         | **≥ 3.16** |
-| libbpf        | **≥ v0.6**（源码集成，建议将 external/libbpf 与项目一同编译） |
+| libbpf        | **≥ v1.2.0**（源码集成，建议将 external/libbpf 与项目一同编译） |
 | 权限          | **root 权限运行程序** |
 
 ---

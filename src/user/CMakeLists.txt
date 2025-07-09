@@ -1,7 +1,6 @@
-# src/user/CMakeLists.txt
-# 编译用户态程序
+cmake_minimum_required(VERSION 3.16)
 
-# 添加可执行文件
+# 添加用户态可执行文件
 add_executable(file_monitor
     main.cpp
     logger.cpp
@@ -9,22 +8,49 @@ add_executable(file_monitor
     skeleton_wrapper.cpp
 )
 
-# 包含目录
-target_include_directories(file_monitor PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/external/libbpf/include
-    ${CMAKE_BINARY_DIR}/src/ebpf  # 包含生成的skeleton头文件
+# 设置版本信息
+target_compile_definitions(file_monitor PRIVATE 
+    PROJECT_VERSION=\"${PROJECT_VERSION}\"
+    KERNEL_VERSION=\"${KERNEL_RELEASE}\"
 )
 
-# 链接库
+# 查找依赖库
+find_library(LIBELF elf REQUIRED)
+find_library(ZLIB z REQUIRED)
+find_library(RT rt REQUIRED)
+
+# 链接依赖库
 target_link_libraries(file_monitor
-    ${LIBBPF_PATH}
-    elf
-    z
+    PRIVATE
+        libbpf
+        ${LIBELF}
+        ${ZLIB}
+        ${RT}
+        pthread
 )
 
-# 添加依赖
-add_dependencies(file_monitor ebpf_programs libbpf bpftool_build)
+# 包含目录
+target_include_directories(file_monitor
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${LIBBPF_BUILD_DIR}/include
+        ${CMAKE_BINARY_DIR}/bin/ebpf  # 包含 eBPF 生成的 skel.h
+)
 
-# 安装可执行文件
-install(TARGETS file_monitor DESTINATION bin)
+# 设置编译选项
+target_compile_definitions(file_monitor
+    PRIVATE
+        _GNU_SOURCE
+        __USE_GNU
+)
+
+# Clang 12 特定警告抑制
+if(CLANG_EXECUTABLE MATCHES "clang-12")
+    target_compile_options(file_monitor PRIVATE
+        "-Wno-deprecated-declarations"
+        "-Wno-ignored-attributes"
+    )
+endif()
+
+# 安装目标
+install(TARGETS file_monitor RUNTIME DESTINATION bin)
