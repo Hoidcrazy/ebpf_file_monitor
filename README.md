@@ -2,7 +2,7 @@
 
 一个基于 **eBPF** 的文件操作生命周期追踪与数据欺骗系统。通过 hook `open`、`read`、`write`、`close` 系统调用，实时监控文件的使用行为，并在读取 `.txt` 文件时动态篡改其内容，实现对用户态程序的“数据欺骗”。
 
-项目采用 `C++` 实现用户态逻辑，`C` 实现 eBPF 内核程序，支持 Linux 5.1 及以上内核版本，兼容麒麟等国产 Linux 发行版。支持 CO-RE（Compile Once, Run Everywhere）与 ring/perf buffer 通信。
+项目采用 `C++` 实现用户态逻辑，`C` 实现 eBPF 内核程序，支持 Linux 5.1 及以上内核版本，兼容麒麟等国产 Linux 发行版。支持 CO-RE（Compile Once, Run Everywhere）与 perf buffer 通信。
 
 ---
 
@@ -107,8 +107,6 @@ ebpf_file_monitor/                   # 项目根目录
 
 ---
 
----
-
 ### 📦 libbpf 集成说明
 
 项目采用 **libbpf v1.2.0**，通过 Git 子模块源码集成，**不依赖系统全局 libbpf** 安装：
@@ -124,8 +122,7 @@ git submodule update --init --recursive
 
 > 强烈推荐使用本项目内置的 libbpf 而非系统预装版本。
 
-
-
+---
 
 
 ## 🧱 构建与运行指南
