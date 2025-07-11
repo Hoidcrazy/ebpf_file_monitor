@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
 project(ebpf_file_monitor LANGUAGES C CXX)
 
+# 添加vmlinux.h
+set(VMLINUX_H_PATH ${PROJECT_SOURCE_DIR}/include/vmlinux.h)
+if(NOT EXISTS ${VMLINUX_H_PATH})
+    message(FATAL_ERROR "vmlinux.h not found at ${VMLINUX_H_PATH}. Please generate it with: bpftool btf dump file /path/to/vmlinux format c > ${VMLINUX_H_PATH}")
+else()
+    message(STATUS "Using vmlinux.h at: ${VMLINUX_H_PATH}")
+endif()
+
+# 添加 vmlinux.h 作为所有 eBPF 目标的依赖
+add_custom_target(vmlinux_h_dep DEPENDS ${VMLINUX_H_PATH})
+
 # 项目版本和基本配置
 set(PROJECT_VERSION "1.0.0")
 set(CMAKE_C_STANDARD 11)
