@@ -4,6 +4,8 @@
 
 项目采用 `C++` 实现用户态逻辑，`C` 实现 eBPF 内核程序，支持 Linux 5.1 及以上内核版本，兼容麒麟等国产 Linux 发行版。支持 CO-RE（Compile Once, Run Everywhere）与 perf buffer 通信。
 
+项目能够更好地适应不同Linux环境，特别是国产麒麟系统等可能缺少标准BTF支持的环境。
+
 ---
 
 ## 🎯 项目目标
