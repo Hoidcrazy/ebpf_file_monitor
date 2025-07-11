@@ -1,0 +1,14 @@
+diff --git a/include/linux/types.h b/include/linux/types.h
+index abc123..def456 100644
+--- a/include/linux/types.h
++++ b/include/linux/types.h
+@@ -1,5 +1,9 @@
+ #ifndef _LINUX_TYPES_H
+ #define _LINUX_TYPES_H
+
++/* 解决 bool 定义冲突 */
++#ifndef __bool_true_false_are_defined
++#define __bool_true_false_are_defined 1
++#endif
+
+ #include <uapi/linux/types.h>

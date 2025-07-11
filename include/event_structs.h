@@ -1,6 +1,8 @@
 // include/event_structs.h
 #pragma once
 
+# include <common.h>
+
 // 内核到用户态传递的事件结构体
 struct open_event {
     int pid;

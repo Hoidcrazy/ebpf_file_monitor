@@ -1,6 +1,8 @@
 #!/bin/bash
 # scripts/build.sh
 
+#./scripts/apply_patches.sh
+
 # 确保在项目根目录执行
 cd "$(dirname "$0")/.."
 

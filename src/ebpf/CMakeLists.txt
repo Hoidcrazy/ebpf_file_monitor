@@ -7,31 +7,24 @@ set(EBPF_INCLUDES
     "${KERNEL_HEADERS_DIR}/include"
     "${KERNEL_HEADERS_DIR}/arch/x86/include/uapi"
     "${KERNEL_HEADERS_DIR}/arch/x86/include/generated/uapi"
-    "${KERNEL_HEADERS_DIR}/include/uapi"
-    "${KERNEL_HEADERS_DIR}/include/generated/uapi"
-    "${PROJECT_SOURCE_DIR}/include"
+    "${PROJECT_SOURCE_DIR}/include"     # vmlinux.h 位置
     "${LIBBPF_BUILD_DIR}/include"
 )
 
-# 生成包含标志
-set(EBPF_INCLUDE_FLAGS "")
+# 生成包含标志列表 - 每个选项单独列出
+set(EBPF_INCLUDE_FLAGS_LIST "")
 foreach(include_dir IN LISTS EBPF_INCLUDES)
-    set(EBPF_INCLUDE_FLAGS "${EBPF_INCLUDE_FLAGS}-I${include_dir} ")
+    list(APPEND EBPF_INCLUDE_FLAGS_LIST "-I${include_dir}")
 endforeach()
 
-# 设置 eBPF 编译标志
+# 设置 eBPF 编译标志 - 每个选项单独列出
 set(EBPF_CFLAGS
-    "${EBPF_INCLUDE_FLAGS}"
-    "-O2 -g"
-    "--target=bpf"
-    "-D__TARGET_ARCH_x86"
-    "-mcpu=v3"
-)
-
-# 添加 Clang 12 的特定优化
-list(APPEND EBPF_CFLAGS
-    "-Xclang -disable-llvm-passes"
-    "-Xclang -debug-info-kind=limited"
+    ${EBPF_INCLUDE_FLAGS_LIST}  # 包含路径列表
+    "-O2"                       # 优化级别单独列出
+    "-g"                        # 调试信息单独列出
+    "--target=bpf"              # BPF 目标
+    "-D__TARGET_ARCH_x86"       # 目标架构
+    "-mcpu=v3"                  # CPU 特性
 )
 
 # 创建 eBPF 输出目录
@@ -41,9 +34,10 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/ebpf)
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.bpf.o
     COMMAND ${CLANG} ${EBPF_CFLAGS} -c ${CMAKE_CURRENT_SOURCE_DIR}/file_monitor.bpf.c -o ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.bpf.o
-    DEPENDS file_monitor.bpf.c
+    DEPENDS file_monitor.bpf.c vmlinux_h_dep  # 依赖 vmlinux.h
     COMMENT "Compiling eBPF program: file_monitor.bpf.c"
     VERBATIM
+    COMMAND_EXPAND_LISTS  # 关键修复：展开列表为单独参数
 )
 
 add_custom_command(
@@ -52,15 +46,17 @@ add_custom_command(
     DEPENDS fd_map.bpf.c
     COMMENT "Compiling eBPF program: fd_map.bpf.c"
     VERBATIM
+    COMMAND_EXPAND_LISTS  # 关键修复：展开列表为单独参数
 )
 
 # 生成带 BTF 的对象文件
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
-    COMMAND ${CLANG} ${EBPF_CFLAGS} -g -c ${CMAKE_CURRENT_SOURCE_DIR}/file_monitor.bpf.c -o ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
+    COMMAND ${CLANG} ${EBPF_CFLAGS} -c ${CMAKE_CURRENT_SOURCE_DIR}/file_monitor.bpf.c -o ${CMAKE_BINARY_DIR}/bin/ebpf/file_monitor.btf.o
     DEPENDS file_monitor.bpf.c
     COMMENT "Generating BTF-enabled eBPF object"
     VERBATIM
+    COMMAND_EXPAND_LISTS  # 关键修复：展开列表为单独参数
 )
 
 # 生成 skeleton 头文件
