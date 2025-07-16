@@ -1,99 +1,145 @@
 // src/user/bpf_loader.cpp
-
-#include "bpf_loader.h"
+#include "user/bpf_loader.h"
+#include "file_monitor.skel.h" // 由bpftool生成
 #include <cstring>
-#include <sys/uio.h>
-#include <sys/ptrace.h>
+#include <iostream>
 #include <fstream>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <fcntl.h>
+#include <sys/utsname.h>
+#include <filesystem>
 
+BPFLoader::BPFLoader() : obj(nullptr), ringBuf(nullptr), perfBuf(nullptr), useRingBuffer(false) {}
 
-void BPFLoader::start_event_loop(Logger& logger) {
-    running_ = true;
-    
-    // 获取ring buffer映射
-    struct bpf_map *rb_map = bpf_object__find_map_by_name(obj_, "events");
-    struct ring_buffer *rb = ring_buffer__new(
-        bpf_map__fd(rb_map),
-        [](void *ctx, void *data, size_t size) -> int {
-            auto self = static_cast<BPFLoader*>(ctx);
-            // 根据事件类型分发处理
-            if (size == sizeof(open_event)) {
-                self->handle_open_event(data);
-            } else if (size == sizeof(rw_event)) {
-                // 区分读写事件
-                auto *evt = static_cast<rw_event*>(data);
-                if (self->bpf_program_attached("sys_read")) {
-                    self->handle_read_event(data);
-                } else if (self->bpf_program_attached("sys_write")) {
-                    self->handle_write_event(data);
-                }
-            } else if (size == sizeof(close_event)) {
-                self->handle_close_event(data);
-            }
-            return 0;
-        }, this, nullptr);
-    
-    while (running_) {
-        ring_buffer__poll(rb, 100 /* timeout_ms */);
-    }
-    
-    ring_buffer__free(rb);
+BPFLoader::~BPFLoader() {
+    if (ringBuf) ring_buffer__free(ringBuf);
+    if (perfBuf) perf_buffer__free(perfBuf);
+    if (obj) file_monitor_bpf__destroy(obj);
 }
 
-// 数据欺骗核心函数
-void modify_process_memory(pid_t pid, unsigned long addr, 
-                          const char* new_data, size_t size) {
-    // 使用PTRACE写入目标进程内存
-    long ret = ptrace(PTRACE_ATTACH, pid, nullptr, nullptr);
-    if (ret == -1) return;
-    
-    waitpid(pid, nullptr, 0);  // 等待进程停止
-    
-    // 逐页写入修改后的数据
-    size_t offset = 0;
-    while (offset < size) {
-        // 计算当前页剩余空间
-        size_t write_size = std::min(size - offset, 
-                                   (size_t)sizeof(long));
-        
-        // 构造iovec结构
-        struct iovec local_iov = {
-            .iov_base = (void*)(new_data + offset),
-            .iov_len = write_size
-        };
-        struct iovec remote_iov = {
-            .iov_base = (void*)(addr + offset),
-            .iov_len = write_size
-        };
-        
-        // 执行进程内存写入
-        process_vm_writev(pid, &local_iov, 1, &remote_iov, 1, 0);
-        offset += write_size;
+bool BPFLoader::load() {
+    // 使用skeleton加载BPF程序
+    obj = file_monitor_bpf__open();
+    if (!obj) {
+        std::cerr << "无法打开BPF程序" << std::endl;
+        return false;
     }
     
-    ptrace(PTRACE_DETACH, pid, nullptr, nullptr);
+    // 编译BPF程序
+    int err = file_monitor_bpf__load(obj);
+    if (err) {
+        std::cerr << "无法加载BPF程序: " << err << std::endl;
+        return false;
+    }
+    
+    return true;
 }
 
-void BPFLoader::handle_read_event(void* data) {
-    auto* evt = static_cast<rw_event*>(data);
-    if (!read_cb_) return;
-    
-    read_cb_(*evt);
-    
-    // 检查是否为.txt文件
-    if (IS_TXT_FILE(path)) {
-        const char* fake_data = "这是一段经过修改缓冲区后的内容。";
-        size_t fake_len = strlen(fake_data) + 1;
-        
-        // 修改目标进程内存
-        modify_process_memory(evt->pid, evt->buf_addr, fake_data, 
-                             std::min(fake_len, evt->size));
-        
-        // 记录欺骗操作
-        char msg[MAX_MSG_LEN];
-        snprintf(msg, sizeof(msg), 
-                "Data Deception Applied | PID: %d | FD: %d | Path: %s",
-                evt->pid, evt->fd, path);
-        logger.log(msg);
+bool BPFLoader::attach() {
+    // 附加BPF程序
+    int err = file_monitor_bpf__attach(obj);
+    if (err) {
+        std::cerr << "无法附加BPF程序: " << err << std::endl;
+        return false;
     }
+    
+    // 根据内核版本选择通信机制
+    selectBufferType();
+    
+    return true;
+}
+
+std::tuple<unsigned int, unsigned int, unsigned int> BPFLoader::getKernelVersion() {
+    struct utsname uts;
+    if (uname(&uts) == 0)  {
+        perror("uname失败");
+        return {0, 0, 0};
+    }
+    
+    unsigned int major = 0, minor = 0, patch = 0;
+    sscanf(uts.release, "%u.%u.%u", &major, &minor, &patch);
+    // return {major, minor, patch};
+    return std::make_tuple(major, minor, patch);
+}
+
+void BPFLoader::selectBufferType() {
+    auto [major, minor, patch] = getKernelVersion();
+    
+    // 内核版本 >= 5.8 使用ring buffer
+    if (major > 5 || (major == 5 && minor >= 8)) {
+        std::cout << "检测到内核版本 " << major << "." << minor << "." << patch
+                  << " (>=5.8)，使用 ring buffer" << std::endl;
+        useRingBuffer = true;
+    } else {
+        std::cout << "检测到内核版本 " << major << "." << minor << "." << patch
+                  << " (<5.8)，使用 perf buffer" << std::endl;
+        useRingBuffer = false;
+    }
+    
+    // 设置事件回调
+    if (useRingBuffer) {
+        ringBuf = ring_buffer__new(bpf_map__fd(obj->maps.events), 
+                                 handleEvent, this, nullptr);
+        if (!ringBuf) {
+            std::cerr << "无法创建ring buffer" << std::endl;
+        }
+    } else {
+        perfBuf = perf_buffer__new(bpf_map__fd(obj->maps.events), 8, 
+                                 handleEvent, nullptr, this, nullptr);
+        if (!perfBuf) {
+            std::cerr << "无法创建perf buffer" << std::endl;
+        }
+    }
+}
+
+void BPFLoader::pollEvents(EventCallback callback) {
+    eventCb = callback;
+    
+    while (true) {
+        if (useRingBuffer && ringBuf) {
+            ring_buffer__poll(ringBuf, 100 /* timeout ms */);
+        } else if (perfBuf) {
+            perf_buffer__poll(perfBuf, 100 /* timeout ms */);
+        }
+    }
+}
+
+int BPFLoader::handleEvent(void *ctx, void *data, size_t size) {
+    BPFLoader* loader = static_cast<BPFLoader*>(ctx);
+    struct event* e = static_cast<struct event*>(data);
+    
+    if (loader && loader->eventCb) {
+        loader->eventCb(*e);
+    }
+    return 0;
+}
+
+bool BPFLoader::modifyProcessMemory(pid_t pid, uint64_t addr, const void* data, size_t size) {
+    // 打开进程内存
+    char memPath[64];
+    snprintf(memPath, sizeof(memPath), "/proc/%d/mem", pid);
+    int memFd = open(memPath, O_RDWR);
+    if (memFd < 0) {
+        perror("无法打开/proc/pid/mem");
+        return false;
+    }
+    
+    // 定位到指定地址
+    if (lseek(memFd, addr, SEEK_SET) == (off_t)-1) {
+        perror("lseek失败");
+        close(memFd);
+        return false;
+    }
+    
+    // 写入新内容
+    ssize_t written = write(memFd, data, size);
+    close(memFd);
+    
+    if (written != (ssize_t)size) {
+        perror("写入内存失败");
+        return false;
+    }
+    
+    return true;
 }

@@ -28,10 +28,14 @@ ebpf_file_monitor/                   # 项目根目录
 │   ├── libbpf/                      # libbpf 源码集成 (使用 Git 子模块，并将其静态链接到用户态加载器应用程序中)
 │   │   ├── CMakeLists.txt
 ├── include/                         # 公共头文件目录
-│   ├── common.h                     # 通用定义（常量、工具宏）
-│   ├── logger.h                     # 日志接口定义（用户态）
-│   ├── event_structs.h              # 内核向用户态传递的事件结构体定义
-│   └── bpf_loader.h                 # eBPF 加载器与事件处理类声明
+│   ├── ebpf/
+│   │   ├── common_ebpf.h            # eBPF 程序专用的公共类型定义
+│   │   ├── event_structs_ebpf.h     # eBPF 程序使用的事件结构体
+│   ├── user/
+│   │   ├── common_user.h            # 用户态程序使用的公共定义（含 stdint.h）
+│   │   ├── event_structs_user.h     # 用户态程序使用的事件结构体（可含调试/打印）
+│   │   ├── logger.h                 # 日志打印接口（用户态）
+│   │   ├── bpf_loader.h             # eBPF 加载器与事件处理类声明
 │   └── vmlinux.h                    # 由于麒麟无法从内核开启CONFIG_DEBUG_INFO_BTF，于是手动生成 BTF 信息
 ├── src/                             # 源码目录（用户态 + 内核态）
 │   ├── user/                        # 用户态程序（C++ 实现）

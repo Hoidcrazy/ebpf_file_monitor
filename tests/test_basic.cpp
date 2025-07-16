@@ -1,28 +1,33 @@
-// tests/test_basic.cpp
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <cstdlib>
 #include <unistd.h>
-#include <sys/types.h>
+#include <sys/wait.h>
 
 int main() {
-    const char* test_file = "tests/test_docs/test_content.txt";
+    pid_t pid = fork();
     
-    // 打开测试文件
-    std::ifstream file(test_file);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open test file" << std::endl;
+    if (pid == 0) { // 子进程
+        // 读取测试文件
+        std::ifstream file("tests/test_docs/test_content.txt");
+        if (!file.is_open()) {
+            std::cerr << "无法打开测试文件" << std::endl;
+            exit(1);
+        }
+        
+        std::string content;
+        std::getline(file, content);
+        file.close();
+        
+        std::cout << "读取内容: " << content << std::endl;
+        exit(0);
+    } else if (pid > 0) { // 父进程
+        waitpid(pid, nullptr, 0);
+    } else {
+        std::cerr << "fork失败" << std::endl;
         return 1;
     }
     
-    // 读取文件内容
-    char buffer[1024];
-    file.read(buffer, sizeof(buffer));
-    buffer[file.gcount()] = '\0';
-    
-    // 输出读取结果
-    std::cout << "Original Content: " << buffer << std::endl;
-    std::cout << "Modified Content: 这是一段经过修改缓冲区后的内容。" << std::endl;
-    
-    file.close();
     return 0;
 }

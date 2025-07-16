@@ -1,41 +1,72 @@
 // src/user/logger.cpp
-#include "logger.h"
-#include <ctime>
-#include <iomanip>
+#include "user/logger.h"
+#include "user/event_structs_user.h"
+#include <filesystem>
+#include <iostream>
 
-Logger::Logger(const std::string& filename) 
-    : log_filename(LOG_DIR + filename) {
-    log_file = fopen(log_filename.c_str(), "a");
-    if (!log_file) {
-        perror("fopen failed");
-        exit(EXIT_FAILURE);
+namespace fs = std::filesystem;
+
+void Logger::init(const std::string& logDir) {
+    this->logDir = logDir;
+    fs::create_directories(logDir);
+    
+    // 创建带时间戳的日志文件
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
+    std::ostringstream oss;
+    oss << "file_monitor_" 
+        << std::put_time(&tm, "%Y%m%d_%H%M%S") 
+        << ".log";
+        
+    std::string logPath = (fs::path(logDir) / oss.str()).string();
+    logFile.open(logPath, std::ios::out);
+    
+    if (!logFile.is_open()) {
+        std::cerr << "无法打开日志文件: " << logPath << std::endl;
     }
-    log("========== Logging Started ==========");
 }
 
 Logger::~Logger() {
-    if (log_file) {
-        log("========== Logging Stopped ==========");
-        fclose(log_file);
+    if (logFile.is_open()) {
+        logFile.close();
     }
 }
 
-void Logger::log(const std::string& message) {
-    auto now = std::time(nullptr);
-    auto tm = *std::localtime(&now);
+void Logger::logEvent(const struct event& e) {
+    // 获取当前时间
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
     
-    std::ostringstream oss;
-    oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << " | " << message;
+    // 事件类型字符串
+    const char* eventType = "";
+    switch (e.type) {
+        case EVENT_OPEN: eventType = "OPEN"; break;
+        case EVENT_READ: eventType = "READ"; break;
+        case EVENT_WRITE: eventType = "WRITE"; break;
+        case EVENT_CLOSE: eventType = "CLOSE"; break;
+        case EVENT_MODIFIED: eventType = "MODIFIED"; break;
+        default: eventType = "UNKNOWN";
+    }
     
-    fprintf(log_file, "%s\n", oss.str().c_str());
-    fflush(log_file);
-}
-
-void Logger::log_event(const char* event_type, pid_t pid, int fd, 
-                      const char* path, size_t size) {
+    // 格式化日志
     std::ostringstream oss;
-    oss << event_type << " | PID: " << pid 
-        << " | FD: " << fd << " | Path: " << path;
-    if (size > 0) oss << " | Size: " << size;
-    log(oss.str());
+    oss << "[" << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << "] "
+        << "PID: " << e.pid << ", "
+        << "FD: " << e.fd << ", "
+        << "Event: " << eventType << ", "
+        << "File: " << e.filename;
+    
+    if (e.type == EVENT_READ || e.type == EVENT_WRITE || e.type == EVENT_MODIFIED) {
+        oss << ", Size: " << e.size;
+    }
+    
+    if (e.type == EVENT_MODIFIED) {
+        oss << ", Content: \"" << e.data << "\"";
+    }
+    
+    // 输出到控制台和日志文件
+    std::cout << oss.str() << std::endl;
+    if (logFile.is_open()) {
+        logFile << oss.str() << std::endl;
+    }
 }

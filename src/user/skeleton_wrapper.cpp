@@ -1,26 +1,23 @@
-// src/user/skeleton_wrapper.cpp
-#include "bpf_loader.h"
-#include <bpf/libbpf.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "user/bpf_loader.h"
+#include "file_monitor.skel.h"
 
-BPFLoader::BPFLoader() : obj_(nullptr), running_(false) {}
-
-BPFLoader::~BPFLoader() {
-    if (obj_) bpf_object__close(obj_);
+// 骨架函数封装
+file_monitor_bpf* BPFLoader::open_bpf_object() {
+    return file_monitor_bpf__open();
 }
 
-bool BPFLoader::load_bpf_program(const std::string& bpf_obj_path) {
-    obj_ = bpf_object__open(bpf_obj_path.c_str());
-    if (!obj_) return false;
-    
-    return bpf_object__load(obj_) == 0;
+int BPFLoader::load_bpf_object(file_monitor_bpf* obj) {
+    return file_monitor_bpf__load(obj);
 }
 
-void BPFLoader::attach_probes() {
-    // 附加所有自动检测的probe
-    bpf_program *prog;
-    bpf_object__for_each_program(prog, obj_) {
-        bpf_program__attach(prog);
-    }
+int BPFLoader::attach_bpf_object(file_monitor_bpf* obj) {
+    return file_monitor_bpf__attach(obj);
+}
+
+void BPFLoader::destroy_bpf_object(file_monitor_bpf* obj) {
+    file_monitor_bpf__destroy(obj);
+}
+
+struct bpf_map* BPFLoader::get_map_by_name(file_monitor_bpf* obj, const char* name) {
+    return bpf_object__find_map_by_name(obj->obj, name);
 }

@@ -1,9 +1,9 @@
 // src/ebpf/fd_map.bpf.c
 #include "vmlinux.h"
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
-#include <bpf/bpf_core_read.h>
-#include "event_structs.h"
+#include "bpf_helpers.h"
+#include "bpf_tracing.h"
+#include "bpf_core_read.h"
+#include "ebpf/event_structs_ebpf.h"
 
 // 文件描述符到路径的映射表
 struct {
