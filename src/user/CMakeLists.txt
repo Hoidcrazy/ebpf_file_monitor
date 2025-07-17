@@ -14,7 +14,13 @@ target_include_directories(ebpf_file_monitor PRIVATE
 )
 
 # 链接依赖库
-target_link_libraries(ebpf_file_monitor PRIVATE libbpf)
+# target_link_libraries(ebpf_file_monitor PRIVATE libbpf)
+target_link_libraries(ebpf_file_monitor PRIVATE
+    libbpf
+    z
+    elf
+    pthread
+)
 
 # 确保ebpf目标先构建
 add_dependencies(ebpf_file_monitor ebpf)

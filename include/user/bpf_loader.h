@@ -34,7 +34,18 @@ public:
     
 private:
     // 处理事件回调
-    static int handleEvent(void* ctx, void* data, size_t size);
+    // static int handleEvent(void* ctx, void* data, size_t size);
+    // static void handleEvent(void* ctx, int cpu, void* data, unsigned int size);
+    // 为 ring_buffer 和 perf_buffer 分别定义回调函数
+    static int handleRingBufferEvent(void* ctx, void* data, size_t size);
+    static void handlePerfBufferEvent(void* ctx, int cpu, void* data, unsigned int size);
+
+    // 新增的骨架封装函数
+    static file_monitor_bpf* open_bpf_object();
+    static int load_bpf_object(file_monitor_bpf* obj);
+    static int attach_bpf_object(file_monitor_bpf* obj);
+    static void destroy_bpf_object(file_monitor_bpf* obj);
+    static struct bpf_map* get_map_by_name(file_monitor_bpf* obj, const char* name);
     
     // 根据内核版本选择buffer类型
     void selectBufferType();

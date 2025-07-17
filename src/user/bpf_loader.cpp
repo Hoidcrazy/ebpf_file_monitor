@@ -63,32 +63,59 @@ std::tuple<unsigned int, unsigned int, unsigned int> BPFLoader::getKernelVersion
     return std::make_tuple(major, minor, patch);
 }
 
+// void BPFLoader::selectBufferType() {
+//     auto [major, minor, patch] = getKernelVersion();
+    
+//     // 内核版本 >= 5.8 使用ring buffer
+//     if (major > 5 || (major == 5 && minor >= 8)) {
+//         std::cout << "检测到内核版本 " << major << "." << minor << "." << patch
+//                   << " (>=5.8)，使用 ring buffer" << std::endl;
+//         useRingBuffer = true;
+//     } else {
+//         std::cout << "检测到内核版本 " << major << "." << minor << "." << patch
+//                   << " (<5.8)，使用 perf buffer" << std::endl;
+//         useRingBuffer = false;
+//     }
+    
+//     // 设置事件回调
+//     if (useRingBuffer) {
+//         ringBuf = ring_buffer__new(bpf_map__fd(obj->maps.events), 
+//                                  handleEvent, this, nullptr);
+//         if (!ringBuf) {
+//             std::cerr << "无法创建ring buffer" << std::endl;
+//         }
+//     } else {
+//         perfBuf = perf_buffer__new(bpf_map__fd(obj->maps.events), 8, 
+//                                  handleEvent, nullptr, this, nullptr);
+//         if (!perfBuf) {
+//             std::cerr << "无法创建perf buffer" << std::endl;
+//         }
+//     }
+// }
+
 void BPFLoader::selectBufferType() {
     auto [major, minor, patch] = getKernelVersion();
-    
-    // 内核版本 >= 5.8 使用ring buffer
+
     if (major > 5 || (major == 5 && minor >= 8)) {
-        std::cout << "检测到内核版本 " << major << "." << minor << "." << patch
-                  << " (>=5.8)，使用 ring buffer" << std::endl;
+        std::cout << "使用 ring buffer (内核 >= 5.8)" << std::endl;
         useRingBuffer = true;
-    } else {
-        std::cout << "检测到内核版本 " << major << "." << minor << "." << patch
-                  << " (<5.8)，使用 perf buffer" << std::endl;
-        useRingBuffer = false;
-    }
-    
-    // 设置事件回调
-    if (useRingBuffer) {
-        ringBuf = ring_buffer__new(bpf_map__fd(obj->maps.events), 
-                                 handleEvent, this, nullptr);
+
+        ringBuf = ring_buffer__new(bpf_map__fd(obj->maps.events),
+                                   handleRingBufferEvent,
+                                   this, nullptr);
         if (!ringBuf) {
-            std::cerr << "无法创建ring buffer" << std::endl;
+            std::cerr << "无法创建 ring buffer" << std::endl;
         }
+
     } else {
-        perfBuf = perf_buffer__new(bpf_map__fd(obj->maps.events), 8, 
-                                 handleEvent, nullptr, this, nullptr);
+        std::cout << "使用 perf buffer (内核 < 5.8)" << std::endl;
+        useRingBuffer = false;
+
+        perfBuf = perf_buffer__new(bpf_map__fd(obj->maps.events), 8,
+                                   handlePerfBufferEvent,
+                                   nullptr, this, nullptr);
         if (!perfBuf) {
-            std::cerr << "无法创建perf buffer" << std::endl;
+            std::cerr << "无法创建 perf buffer" << std::endl;
         }
     }
 }
@@ -105,14 +132,42 @@ void BPFLoader::pollEvents(EventCallback callback) {
     }
 }
 
-int BPFLoader::handleEvent(void *ctx, void *data, size_t size) {
+// int BPFLoader::handleEvent(void *ctx, void *data, size_t size) {
+//     BPFLoader* loader = static_cast<BPFLoader*>(ctx);
+//     struct event* e = static_cast<struct event*>(data);
+    
+//     if (loader && loader->eventCb) {
+//         loader->eventCb(*e);
+//     }
+//     return 0;
+// }
+
+// void BPFLoader::handleEvent(void *ctx, int cpu, void *data, unsigned int size) {
+//     BPFLoader* loader = static_cast<BPFLoader*>(ctx);
+//     struct event* e = static_cast<struct event*>(data);
+
+//     if (loader && loader->eventCb) {
+//         loader->eventCb(*e);
+//     }
+// }
+
+int BPFLoader::handleRingBufferEvent(void* ctx, void* data, size_t size) {
     BPFLoader* loader = static_cast<BPFLoader*>(ctx);
     struct event* e = static_cast<struct event*>(data);
-    
+
     if (loader && loader->eventCb) {
         loader->eventCb(*e);
     }
-    return 0;
+    return 0; // ring_buffer 要求返回 int
+}
+
+void BPFLoader::handlePerfBufferEvent(void* ctx, int cpu, void* data, unsigned int size) {
+    BPFLoader* loader = static_cast<BPFLoader*>(ctx);
+    struct event* e = static_cast<struct event*>(data);
+
+    if (loader && loader->eventCb) {
+        loader->eventCb(*e);
+    }
 }
 
 bool BPFLoader::modifyProcessMemory(pid_t pid, uint64_t addr, const void* data, size_t size) {
