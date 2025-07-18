@@ -1,3 +1,4 @@
+# File: scripts/run.sh
 #!/bin/bash
 
 # 检查是否root
