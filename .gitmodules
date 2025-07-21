@@ -1,4 +1,4 @@
 [submodule "external/libbpf"]
 	path = external/libbpf
-	url = https://github.com/libbpf/libbpf.git
-	branch = master
+	url = https://github.com/Hoidcrazy/libbpf.git
+	branch = patch-libbpf
