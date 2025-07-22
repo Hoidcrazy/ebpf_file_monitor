@@ -2,6 +2,7 @@
 # 查找Clang
 find_program(CLANG_PATH clang REQUIRED)
 find_program(BPFTOOL_PATH bpftool REQUIRED)
+# find_program(PAHOLE_PATH pahole REQUIRED)
 
 # 设置eBPF编译选项
 set(EBPF_FLAGS
@@ -20,6 +21,7 @@ set(EBPF_FLAGS
     # 添加 glibc 的系统头文件路径,以支持标准库函数
     -I/usr/include/x86_64-linux-gnu
 )
+
 
 # 编译eBPF程序
 add_custom_command(

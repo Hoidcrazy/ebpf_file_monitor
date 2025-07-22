@@ -11,6 +11,9 @@ add_executable(ebpf_file_monitor
 target_include_directories(ebpf_file_monitor PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_BINARY_DIR}/src/ebpf  # 直接使用路径
+    ${CMAKE_SOURCE_DIR}/external/libbpf/src
+    ${CMAKE_SOURCE_DIR}/external/libbpf/include
+    ${CMAKE_SOURCE_DIR}/external/libbpf
 )
 
 # 链接依赖库
